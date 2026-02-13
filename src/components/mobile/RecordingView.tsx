@@ -122,7 +122,20 @@ export default function RecordingView() {
   const handleSave = useCallback(async (userId: string) => {
     setIsSaving(true);
     try {
-      // 1. 프로젝트 생성
+      // 1. 사용자 생성/확인 (없으면 자동 생성)
+      const authRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+
+      if (!authRes.ok) {
+        alert('사용자 확인에 실패했습니다.');
+        setIsSaving(false);
+        return;
+      }
+
+      // 2. 프로젝트 생성
       const projectRes = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
