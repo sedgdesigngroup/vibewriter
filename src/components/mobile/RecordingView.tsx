@@ -12,6 +12,8 @@ import TranscriptionMirror from './TranscriptionMirror';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import SaveIdDialog from './SaveIdDialog';
 
+const STORAGE_KEY = 'vibe-writing-userId';
+
 export default function RecordingView() {
   const {
     isRecording,
@@ -36,6 +38,15 @@ export default function RecordingView() {
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [savedUserId, setSavedUserId] = useState<string | null>(null);
+
+  // localStorage에서 저장된 아이디 불러오기
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      setSavedUserId(stored);
+    }
+  }, []);
 
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -109,19 +120,13 @@ export default function RecordingView() {
     setShowStopConfirm(true);
   }, []);
 
-  const handleStopConfirm = useCallback(() => {
-    setShowStopConfirm(false);
-    stopRecording();
-    stopRecognition();
-    stopVisualizer();
-    setAnalyser(null);
-    releaseWakeLock();
-    setShowSaveDialog(true);
-  }, [stopRecording, stopRecognition, stopVisualizer, releaseWakeLock]);
-
   const handleSave = useCallback(async (userId: string) => {
     setIsSaving(true);
     try {
+      // localStorage에 아이디 저장 (다음부터 자동 로그인)
+      localStorage.setItem(STORAGE_KEY, userId);
+      setSavedUserId(userId);
+
       // 1. 사용자 생성/확인 (없으면 자동 생성)
       const authRes = await fetch('/api/auth/login', {
         method: 'POST',
@@ -154,7 +159,7 @@ export default function RecordingView() {
 
       const project = await projectRes.json();
 
-      // 2. 전사 데이터 저장
+      // 3. 전사 데이터 저장
       if (segments.length > 0) {
         const transRes = await fetch('/api/transcription', {
           method: 'POST',
@@ -174,7 +179,7 @@ export default function RecordingView() {
         }
       }
 
-      // 3. GPT 템플릿 생성 트리거
+      // 4. GPT 템플릿 생성 트리거
       fetch('/api/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -192,18 +197,64 @@ export default function RecordingView() {
     }
   }, [duration, segments, reset]);
 
+  const handleStopConfirm = useCallback(() => {
+    setShowStopConfirm(false);
+    stopRecording();
+    stopRecognition();
+    stopVisualizer();
+    setAnalyser(null);
+    releaseWakeLock();
+
+    // 저장된 아이디가 있으면 바로 저장, 없으면 다이얼로그 표시
+    const storedId = localStorage.getItem(STORAGE_KEY);
+    if (storedId) {
+      handleSave(storedId);
+    } else {
+      setShowSaveDialog(true);
+    }
+  }, [stopRecording, stopRecognition, stopVisualizer, releaseWakeLock, handleSave]);
+
   const handleSaveClose = useCallback(() => {
     setShowSaveDialog(false);
     reset();
   }, [reset]);
 
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
+    setSavedUserId(null);
+  }, []);
+
   return (
     <div className="flex flex-col h-screen bg-slate-900 p-4 pt-safe">
       {/* 헤더 */}
-      <div className="text-center mb-4">
+      <div className="relative text-center mb-4">
         <h1 className="text-xl font-bold text-white">바이브라이팅</h1>
-        <p className="text-slate-400 text-xs mt-1">음성을 텍스트로 전사합니다</p>
+        {savedUserId ? (
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <span className="text-slate-400 text-xs">{savedUserId}</span>
+            <button
+              onClick={handleLogout}
+              disabled={isRecording}
+              className="text-xs text-red-400 hover:text-red-300 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              로그아웃
+            </button>
+          </div>
+        ) : (
+          <p className="text-slate-400 text-xs mt-1">음성을 텍스트로 전사합니다</p>
+        )}
       </div>
+
+      {/* 자동 저장 중 표시 */}
+      {isSaving && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-slate-800 rounded-2xl p-6 text-center">
+            <div className="animate-spin w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full mx-auto mb-3" />
+            <p className="text-white font-medium">저장 중...</p>
+            <p className="text-slate-400 text-xs mt-1">잠시만 기다려주세요</p>
+          </div>
+        </div>
+      )}
 
       {/* 파형 시각화 */}
       <div className="mb-4">
