@@ -50,6 +50,7 @@ export default function ContentViewer({ projectId }: ContentViewerProps) {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [hasModified, setHasModified] = useState(false);
+  const [removedContents, setRemovedContents] = useState<string[]>([]);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -75,6 +76,7 @@ export default function ContentViewer({ projectId }: ContentViewerProps) {
   useEffect(() => {
     setInitialLoading(true);
     setHasModified(false);
+    setRemovedContents([]);
     setSelectedSessionId(null);
     fetchData(true);
 
@@ -115,6 +117,10 @@ export default function ContentViewer({ projectId }: ContentViewerProps) {
       });
 
       if (res.ok) {
+        const data = await res.json();
+        if (data.removedContent) {
+          setRemovedContents(prev => [...prev, data.removedContent]);
+        }
         setHasModified(true);
         setSelectedSessionId(null);
         await fetchData(false);
@@ -136,17 +142,23 @@ export default function ContentViewer({ projectId }: ContentViewerProps) {
       }
     }
 
-    // 삭제된 내용은 서버에서 이미 제거됨 → 갱신된 원문 기반으로 재생성
-    // 여기서는 간단히 전체 재생성 트리거
+    const combinedRemoved = removedContents.join('\n');
+
     try {
       const res = await fetch('/api/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({
+          projectId,
+          mode: 'update',
+          removedContent: combinedRemoved,
+          existingTemplates,
+        }),
       });
 
       if (res.ok) {
         setHasModified(false);
+        setRemovedContents([]);
         // 폴링 재시작
         if (pollingRef.current) clearInterval(pollingRef.current);
         pollingRef.current = setInterval(() => fetchData(false), 10000);
@@ -157,7 +169,7 @@ export default function ContentViewer({ projectId }: ContentViewerProps) {
     } finally {
       setIsRegenerating(false);
     }
-  }, [projectId, templates, fetchData]);
+  }, [projectId, templates, removedContents, fetchData]);
 
   if (initialLoading) {
     return (
