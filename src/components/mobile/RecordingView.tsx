@@ -91,12 +91,7 @@ export default function RecordingView({ onSwitchMode }: RecordingViewProps) {
     };
   }, [isRecording, isPaused, setDuration]);
 
-  const handleStart = useCallback(() => {
-    setShowMicPermission(true);
-  }, []);
-
-  const handleMicAllow = useCallback(async () => {
-    setShowMicPermission(false);
+  const startRecordingFlow = useCallback(async () => {
     try {
       const result = await startVisualizer();
       setAnalyser(result.analyser);
@@ -110,6 +105,25 @@ export default function RecordingView({ onSwitchMode }: RecordingViewProps) {
       toast.error('마이크 접근이 거부되었습니다.');
     }
   }, [startVisualizer, startRecording, startRecognition, acquireWakeLock]);
+
+  const handleStart = useCallback(async () => {
+    // 이미 마이크 권한이 있으면 바로 시작
+    try {
+      const perm = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      if (perm.state === 'granted') {
+        startRecordingFlow();
+        return;
+      }
+    } catch {
+      // permissions API 미지원 시 다이얼로그 표시
+    }
+    setShowMicPermission(true);
+  }, [startRecordingFlow]);
+
+  const handleMicAllow = useCallback(async () => {
+    setShowMicPermission(false);
+    startRecordingFlow();
+  }, [startRecordingFlow]);
 
   const handlePause = useCallback(() => {
     pauseRecording();
