@@ -1,17 +1,102 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { processAllTemplates } from '@/lib/templates';
+import { generateTemplate } from '@/lib/openai/gpt';
+import { getUpdateSystemPrompt, getUpdateUserPrompt } from '@/lib/templates/updatePrompt';
 import type { TemplateType } from '@/types';
 
 export const maxDuration = 300; // Vercel Pro: 최대 5분
 
 export async function POST(request: NextRequest) {
-  const { projectId } = await request.json();
+  const body = await request.json();
+  const { projectId, mode } = body;
 
   if (!projectId) {
     return NextResponse.json({ error: '프로젝트 ID가 필요합니다' }, { status: 400 });
   }
 
+  if (mode === 'update') {
+    return handleUpdateMode(projectId, body.removedContent, body.existingTemplates);
+  }
+
+  return handleFullMode(projectId);
+}
+
+// 부분 재생성: 삭제된 내용만 반영하여 기존 템플릿 수정 (토큰 절약)
+async function handleUpdateMode(
+  projectId: string,
+  removedContent: string,
+  existingTemplates: Record<string, string>
+) {
+  if (!removedContent || !existingTemplates) {
+    return NextResponse.json({ error: '삭제된 내용과 기존 템플릿이 필요합니다' }, { status: 400 });
+  }
+
+  const types: TemplateType[] = ['card_news', 'meeting_minutes'];
+
+  for (const type of types) {
+    if (existingTemplates[type]) {
+      await supabaseAdmin
+        .from('template_results')
+        .update({ status: 'processing', error_message: null })
+        .eq('project_id', projectId)
+        .eq('template_type', type);
+    }
+  }
+
+  await supabaseAdmin
+    .from('projects')
+    .update({ status: 'processing' })
+    .eq('id', projectId);
+
+  try {
+    const updatePromises = types
+      .filter(type => existingTemplates[type])
+      .map(async (type) => {
+        const systemPrompt = getUpdateSystemPrompt(type);
+        const userPrompt = getUpdateUserPrompt(existingTemplates[type], removedContent);
+        const content = await generateTemplate(userPrompt, systemPrompt);
+        return { type, content };
+      });
+
+    const results = await Promise.allSettled(updatePromises);
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        await supabaseAdmin
+          .from('template_results')
+          .update({
+            content: result.value.content,
+            status: 'completed',
+            error_message: null,
+          })
+          .eq('project_id', projectId)
+          .eq('template_type', result.value.type);
+      }
+    }
+
+    const hasFailure = results.some(r => r.status === 'rejected');
+    await supabaseAdmin
+      .from('projects')
+      .update({ status: hasFailure ? 'failed' : 'completed' })
+      .eq('id', projectId);
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    await supabaseAdmin
+      .from('projects')
+      .update({ status: 'failed' })
+      .eq('id', projectId);
+
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : '업데이트 실패' },
+      { status: 500 }
+    );
+  }
+}
+
+// 전체 재생성
+async function handleFullMode(projectId: string) {
   // 전사 데이터 조회
   const { data: transcriptions, error: fetchError } = await supabaseAdmin
     .from('transcriptions')
@@ -46,7 +131,7 @@ export async function POST(request: NextRequest) {
     .update({ status: 'processing' })
     .eq('id', projectId);
 
-  // GPT로 4종 템플릿 동시 생성
+  // GPT로 템플릿 동시 생성
   try {
     const results = await processAllTemplates(fullText);
 

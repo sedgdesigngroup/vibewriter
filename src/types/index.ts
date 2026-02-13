@@ -6,6 +6,9 @@ export interface TranscriptionSegment {
   timestamp: number; // 녹음 시작 기준 경과 시간 (ms)
   order: number;
   savedToServer: boolean;
+  // 하루종일 모드 전용 (기존 녹음에서는 미사용)
+  speechSessionId?: string; // 소속 세션 ID (침묵 기준 분리 단위)
+  clockTime?: number;       // 실제 시각 (Date.now())
 }
 
 // 프로젝트
@@ -55,4 +58,43 @@ export interface RecordingState {
   duration: number; // ms
   segments: TranscriptionSegment[];
   interimText: string; // 아직 확정되지 않은 텍스트
+}
+
+// ─── 하루종일 녹음 모드 타입 ───
+
+// 세션: 침묵 1분 기준 자동 분리되는 연속 발화 단위
+export interface SpeechSession {
+  id: string;
+  sessionGroupId: string;
+  startTime: number;     // 실제 시각 (Date.now())
+  endTime: number | null;
+  segments: TranscriptionSegment[];
+  order: number;
+}
+
+// 세션그룹: 녹음 on/off 한 사이클
+export interface SessionGroup {
+  id: string;
+  allDaySessionId: string;
+  startTime: number;
+  endTime: number | null;
+  sessions: SpeechSession[];
+  order: number;
+}
+
+// 하루종일 녹음
+export interface AllDaySession {
+  id: string;
+  startDate: string;     // YYYY-MM-DD
+  startTime: number;
+  endTime: number | null;
+  status: 'active' | 'completed';
+  sessionGroups: SessionGroup[];
+  gaps: BackgroundGap[];
+}
+
+// 백그라운드 중단 기록
+export interface BackgroundGap {
+  startTime: number;
+  endTime: number;
 }

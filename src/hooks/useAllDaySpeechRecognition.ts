@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from 'react';
-import { useRecordingStore } from '@/stores/recordingStore';
-import toast from 'react-hot-toast';
+import { useAllDayStore } from '@/stores/allDayStore';
 
 // Web Speech API 타입 선언
 interface SpeechRecognitionEvent extends Event {
@@ -30,28 +29,67 @@ declare global {
   }
 }
 
-export function useSpeechRecognition() {
+const SILENCE_TIMEOUT_MS = 60000; // 1분 침묵 → 세션 종료
+const SILENCE_CHECK_INTERVAL_MS = 5000; // 5초마다 침묵 체크
+
+export function useAllDaySpeechRecognition() {
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const shouldRestartRef = useRef(false);
+  const silenceCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const {
     isRecording,
-    isPaused,
+    lastSpeechTime,
+    currentSession,
     addSegment,
     setInterimText,
-  } = useRecordingStore();
+    finalizeSession,
+  } = useAllDayStore();
 
   const isRecordingRef = useRef(isRecording);
-  const isPausedRef = useRef(isPaused);
+  const lastSpeechTimeRef = useRef(lastSpeechTime);
+  const currentSessionRef = useRef(currentSession);
 
   useEffect(() => {
     isRecordingRef.current = isRecording;
-    isPausedRef.current = isPaused;
-  }, [isRecording, isPaused]);
+  }, [isRecording]);
+
+  useEffect(() => {
+    lastSpeechTimeRef.current = lastSpeechTime;
+  }, [lastSpeechTime]);
+
+  useEffect(() => {
+    currentSessionRef.current = currentSession;
+  }, [currentSession]);
+
+  // 침묵 체크 타이머
+  const startSilenceCheck = useCallback(() => {
+    if (silenceCheckRef.current) clearInterval(silenceCheckRef.current);
+
+    silenceCheckRef.current = setInterval(() => {
+      const lastTime = lastSpeechTimeRef.current;
+      const session = currentSessionRef.current;
+
+      if (lastTime && session && session.segments.length > 0) {
+        const silenceDuration = Date.now() - lastTime;
+        if (silenceDuration >= SILENCE_TIMEOUT_MS) {
+          finalizeSession();
+        }
+      }
+    }, SILENCE_CHECK_INTERVAL_MS);
+  }, [finalizeSession]);
+
+  const stopSilenceCheck = useCallback(() => {
+    if (silenceCheckRef.current) {
+      clearInterval(silenceCheckRef.current);
+      silenceCheckRef.current = null;
+    }
+  }, []);
 
   const startRecognition = useCallback(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      toast.error('이 브라우저는 음성 인식을 지원하지 않습니다. Chrome 또는 Safari를 사용해주세요.');
+      alert('이 브라우저는 음성 인식을 지원하지 않습니다. Chrome 또는 Safari를 사용해주세요.');
       return;
     }
 
@@ -82,11 +120,11 @@ export function useSpeechRecognition() {
     };
 
     recognition.onend = () => {
-      // 사용자가 정지하지 않았다면 자동 재시작
-      if (isRecordingRef.current && !isPausedRef.current && shouldRestartRef.current) {
+      // 녹음 중이면 자동 재시작
+      if (isRecordingRef.current && shouldRestartRef.current) {
         try {
           setTimeout(() => {
-            if (isRecordingRef.current && !isPausedRef.current) {
+            if (isRecordingRef.current && shouldRestartRef.current) {
               recognition.start();
             }
           }, 100);
@@ -97,8 +135,6 @@ export function useSpeechRecognition() {
     };
 
     recognition.onerror = (event: Event & { error: string }) => {
-      // 'no-speech'는 정상 - 침묵 시 발생, 자동 재시작됨
-      // 'aborted'는 pause/stop 시 발생
       if (event.error !== 'no-speech' && event.error !== 'aborted') {
         console.error('Speech recognition error:', event.error);
       }
@@ -112,10 +148,13 @@ export function useSpeechRecognition() {
     } catch {
       // 이미 시작된 경우
     }
-  }, [addSegment, setInterimText]);
+
+    startSilenceCheck();
+  }, [addSegment, setInterimText, startSilenceCheck]);
 
   const stopRecognition = useCallback(() => {
     shouldRestartRef.current = false;
+    stopSilenceCheck();
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -124,37 +163,26 @@ export function useSpeechRecognition() {
       }
       recognitionRef.current = null;
     }
-  }, []);
+  }, [stopSilenceCheck]);
 
-  const pauseRecognition = useCallback(() => {
-    shouldRestartRef.current = false;
+  // 포그라운드 복귀 시 강제 재시작
+  const forceRestart = useCallback(() => {
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
       } catch {
-        // 이미 중지된 경우
+        // 무시
       }
+      recognitionRef.current = null;
     }
-  }, []);
-
-  const resumeRecognition = useCallback(() => {
-    shouldRestartRef.current = true;
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.start();
-      } catch {
-        // 시작 실패 시 새로 생성
-        startRecognition();
-      }
-    } else {
-      startRecognition();
-    }
+    startRecognition();
   }, [startRecognition]);
 
   // 컴포넌트 언마운트 시 정리
   useEffect(() => {
     return () => {
       shouldRestartRef.current = false;
+      stopSilenceCheck();
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
@@ -163,13 +191,12 @@ export function useSpeechRecognition() {
         }
       }
     };
-  }, []);
+  }, [stopSilenceCheck]);
 
   return {
     startRecognition,
     stopRecognition,
-    pauseRecognition,
-    resumeRecognition,
+    forceRestart,
     isSupported: typeof window !== 'undefined' &&
       !!(window.SpeechRecognition || window.webkitSpeechRecognition),
   };

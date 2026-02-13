@@ -16,16 +16,31 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // 전사 원문도 함께 반환
+  // 전사 원문 (세션 정보 포함)
   const { data: transcriptions } = await supabaseAdmin
     .from('transcriptions')
-    .select('content, timestamp_seconds, segment_order')
+    .select('content, timestamp_seconds, segment_order, session_id, clock_time')
     .eq('project_id', projectId)
     .order('segment_order');
+
+  // 세션그룹 + 세션 정보 (있으면)
+  const { data: sessionGroups } = await supabaseAdmin
+    .from('session_groups')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('group_order');
+
+  const { data: sessions } = await supabaseAdmin
+    .from('sessions')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('session_order');
 
   return NextResponse.json({
     projectId,
     templates: templates || [],
     transcription: transcriptions || [],
+    sessionGroups: sessionGroups || [],
+    sessions: sessions || [],
   });
 }

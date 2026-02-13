@@ -11,10 +11,15 @@ import AudioVisualizer from './AudioVisualizer';
 import TranscriptionMirror from './TranscriptionMirror';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import SaveIdDialog from './SaveIdDialog';
+import toast from 'react-hot-toast';
 
 const STORAGE_KEY = 'vibe-writing-userId';
 
-export default function RecordingView() {
+interface RecordingViewProps {
+  onSwitchMode: () => void;
+}
+
+export default function RecordingView({ onSwitchMode }: RecordingViewProps) {
   const {
     isRecording,
     isPaused,
@@ -51,6 +56,7 @@ export default function RecordingView() {
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
   const pausedDurationRef = useRef<number>(0);
+  const pauseStartTimeRef = useRef<number>(0);
 
   // 세그먼트 변경 시 IndexedDB에 저장
   const lastSavedCountRef = useRef(0);
@@ -101,17 +107,21 @@ export default function RecordingView() {
       pausedDurationRef.current = 0;
       lastSavedCountRef.current = 0;
     } catch {
-      alert('마이크 접근이 거부되었습니다.');
+      toast.error('마이크 접근이 거부되었습니다.');
     }
   }, [startVisualizer, startRecording, startRecognition, acquireWakeLock]);
 
   const handlePause = useCallback(() => {
     pauseRecording();
     pauseRecognition();
-    pausedDurationRef.current += 0; // 일시중지 시점 기록
+    pauseStartTimeRef.current = Date.now();
   }, [pauseRecording, pauseRecognition]);
 
   const handleResume = useCallback(() => {
+    if (pauseStartTimeRef.current > 0) {
+      pausedDurationRef.current += Date.now() - pauseStartTimeRef.current;
+      pauseStartTimeRef.current = 0;
+    }
     resumeRecording();
     resumeSpeech();
   }, [resumeRecording, resumeSpeech]);
@@ -135,7 +145,7 @@ export default function RecordingView() {
       });
 
       if (!authRes.ok) {
-        alert('사용자 확인에 실패했습니다.');
+        toast.error('사용자 확인에 실패했습니다.');
         setIsSaving(false);
         return;
       }
@@ -152,7 +162,7 @@ export default function RecordingView() {
 
       if (!projectRes.ok) {
         const err = await projectRes.json();
-        alert(err.error || '프로젝트 생성에 실패했습니다.');
+        toast.error(err.error || '프로젝트 생성에 실패했습니다.');
         setIsSaving(false);
         return;
       }
@@ -188,10 +198,10 @@ export default function RecordingView() {
 
       setShowSaveDialog(false);
       reset();
-      alert('저장되었습니다! 템플릿 생성이 진행 중입니다.');
+      toast.success('저장되었습니다! 템플릿 생성이 진행 중입니다.');
     } catch (err) {
       console.error('저장 실패:', err);
-      alert('저장에 실패했습니다. 다시 시도해주세요.');
+      toast.error('저장에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setIsSaving(false);
     }
@@ -242,6 +252,14 @@ export default function RecordingView() {
           </div>
         ) : (
           <p className="text-slate-400 text-xs mt-1">음성을 텍스트로 전사합니다</p>
+        )}
+        {!isRecording && (
+          <button
+            onClick={onSwitchMode}
+            className="inline-block mt-2 px-3 py-1 bg-sky-500/20 text-sky-400 text-xs rounded-full hover:bg-sky-500/30 transition-colors"
+          >
+            상시 녹음 모드
+          </button>
         )}
       </div>
 
