@@ -53,45 +53,45 @@ export default function AllDayRecordingView({ onSwitchMode }: AllDayRecordingVie
     if (stored) setSavedUserId(stored);
   }, []);
 
-  // 경과 시간 갱신 (1초마다)
+  // 경과 시간 갱신 (5초마다 — 모바일 부하 감소)
   useEffect(() => {
     if (!allDaySession) return;
-    const timer = setInterval(() => setElapsedTick(t => t + 1), 1000);
+    const timer = setInterval(() => setElapsedTick(t => t + 1), 5000);
     return () => clearInterval(timer);
   }, [allDaySession?.id]);
 
-  // 백그라운드 감지
+  // 백그라운드 감지 — Silent Audio는 백그라운드에서만 재생 (포그라운드에서 마이크 간섭 방지)
   useBackgroundDetection({
     enabled: !!allDaySession && allDaySession.status === 'active',
     onBackgrounded: useCallback(() => {
       onBackgrounded();
       persistNow();
-    }, [onBackgrounded, persistNow]),
+      startKeepAlive(); // 백그라운드 진입 시에만 무음 재생 시작
+    }, [onBackgrounded, persistNow, startKeepAlive]),
     onForegrounded: useCallback((_gapMs: number) => {
+      stopKeepAlive(); // 포그라운드 복귀 시 무음 재생 중지 (마이크 간섭 방지)
       onForegrounded();
       if (isRecording) {
         forceRestart();
         acquireWakeLock();
       }
-    }, [onForegrounded, isRecording, forceRestart, acquireWakeLock]),
+    }, [stopKeepAlive, onForegrounded, isRecording, forceRestart, acquireWakeLock]),
   });
 
-  // 하루종일 녹음 시작
+  // 하루종일 녹음 시작 (Silent Audio는 백그라운드 진입 시에만 시작)
   const handleStartAllDay = useCallback(async () => {
     startAllDay();
     startSessionGroup();
     startRecognition();
     await acquireWakeLock();
-    startKeepAlive();
-  }, [startAllDay, startSessionGroup, startRecognition, acquireWakeLock, startKeepAlive]);
+  }, [startAllDay, startSessionGroup, startRecognition, acquireWakeLock]);
 
   // 세션그룹 시작 (녹음 on)
   const handleStartGroup = useCallback(async () => {
     startSessionGroup();
     startRecognition();
     await acquireWakeLock();
-    startKeepAlive();
-  }, [startSessionGroup, startRecognition, acquireWakeLock, startKeepAlive]);
+  }, [startSessionGroup, startRecognition, acquireWakeLock]);
 
   // 세션그룹 종료 (녹음 off)
   const handleStopGroup = useCallback(() => {
