@@ -1,14 +1,11 @@
 import type { TemplateType } from '@/types';
 import { generateTemplate, summarizeChunk } from '@/lib/openai/gpt';
+import { searchRelatedTopics } from '@/lib/openai/webSearch';
 import { CARD_NEWS_PROMPT } from './cardNews';
-import { SHORT_STORY_PROMPT } from './shortStory';
-import { KEY_POINTS_PROMPT } from './keyPoints';
 import { MEETING_MINUTES_PROMPT } from './meetingMinutes';
 
 const TEMPLATE_PROMPTS: Record<TemplateType, string> = {
   card_news: CARD_NEWS_PROMPT,
-  short_story: SHORT_STORY_PROMPT,
-  key_points: KEY_POINTS_PROMPT,
   meeting_minutes: MEETING_MINUTES_PROMPT,
 };
 
@@ -42,10 +39,16 @@ function splitText(text: string, maxTokens: number): string[] {
 
 export async function processTemplate(
   transcription: string,
-  templateType: TemplateType
+  templateType: TemplateType,
+  webSearchContext: string
 ): Promise<string> {
   const tokens = estimateTokens(transcription);
-  const prompt = TEMPLATE_PROMPTS[templateType];
+  const basePrompt = TEMPLATE_PROMPTS[templateType];
+
+  // 웹서치 컨텍스트가 있으면 프롬프트에 추가
+  const prompt = webSearchContext
+    ? `${basePrompt}\n\n---\n\n아래는 웹 검색을 통해 수집한 관련 정보입니다. 이 정보를 참고하여 내용을 더 풍성하게 만들어주세요. 관련 이론, 트렌드, 사례 등을 자연스럽게 녹여주세요:\n\n${webSearchContext}`
+    : basePrompt;
 
   // 80K 토큰 이하면 단일 패스
   if (tokens <= 80000) {
@@ -66,10 +69,15 @@ export async function processTemplate(
 export async function processAllTemplates(
   transcription: string
 ): Promise<Record<TemplateType, { content: string | null; error: string | null }>> {
-  const types: TemplateType[] = ['card_news', 'short_story', 'key_points', 'meeting_minutes'];
+  const types: TemplateType[] = ['card_news', 'meeting_minutes'];
+
+  // 웹 검색으로 관련 정보 수집 (모든 템플릿이 공유)
+  console.log('웹 검색 enrichment 시작...');
+  const webSearchContext = await searchRelatedTopics(transcription);
+  console.log('웹 검색 완료:', webSearchContext ? `${webSearchContext.length}자` : '결과 없음');
 
   const results = await Promise.allSettled(
-    types.map(type => processTemplate(transcription, type))
+    types.map(type => processTemplate(transcription, type, webSearchContext))
   );
 
   const output: Record<string, { content: string | null; error: string | null }> = {};

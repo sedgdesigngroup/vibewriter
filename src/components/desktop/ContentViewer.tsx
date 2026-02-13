@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { TemplateType } from '@/types';
 import { TEMPLATE_LABELS } from '@/types';
 
@@ -20,47 +20,52 @@ interface TranscriptionData {
   segment_order: number;
 }
 
-const TEMPLATE_TYPES: TemplateType[] = ['card_news', 'short_story', 'key_points', 'meeting_minutes'];
+const TEMPLATE_TYPES: TemplateType[] = ['card_news', 'meeting_minutes'];
 
 export default function ContentViewer({ projectId }: ContentViewerProps) {
   const [viewMode, setViewMode] = useState<'raw' | 'template'>('template');
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>('card_news');
   const [templates, setTemplates] = useState<TemplateData[]>([]);
   const [transcription, setTranscription] = useState<TranscriptionData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/templates/${projectId}`);
-        const data = await res.json();
-        setTemplates(data.templates || []);
-        setTranscription(data.transcription || []);
-      } catch (err) {
-        console.error('데이터 로드 실패:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-    // 처리 중인 경우 10초마다 폴링
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
+  const fetchData = useCallback(async (isInitial: boolean) => {
+    try {
+      const res = await fetch(`/api/templates/${projectId}`);
+      const data = await res.json();
+      setTemplates(data.templates || []);
+      setTranscription(data.transcription || []);
+    } catch (err) {
+      console.error('데이터 로드 실패:', err);
+    } finally {
+      if (isInitial) setInitialLoading(false);
+    }
   }, [projectId]);
 
-  const currentTemplate = templates.find(t => t.template_type === selectedTemplate);
-  const isProcessing = templates.some(t => t.status === 'processing');
-
-  // 처리 완료 시 폴링 중지
+  // 초기 로드 + 폴링
   useEffect(() => {
-    if (!isProcessing && templates.length > 0) {
-      // 폴링 불필요
+    setInitialLoading(true);
+    fetchData(true);
+
+    pollingRef.current = setInterval(() => fetchData(false), 10000);
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [fetchData]);
+
+  const isProcessing = templates.some(t => t.status === 'processing' || t.status === 'pending');
+  const currentTemplate = templates.find(t => t.template_type === selectedTemplate);
+
+  // 모든 템플릿 처리 완료 시 폴링 중지
+  useEffect(() => {
+    if (!isProcessing && templates.length > 0 && pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
     }
   }, [isProcessing, templates.length]);
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="flex items-center justify-center h-full text-slate-400">
         로딩 중...

@@ -23,7 +23,7 @@ export interface Project {
 export type ProjectStatus = 'recording' | 'processing' | 'completed' | 'failed';
 
 // 템플릿
-export type TemplateType = 'card_news' | 'short_story' | 'key_points' | 'meeting_minutes';
+export type TemplateType = 'card_news' | 'meeting_minutes';
 
 export interface TemplateResult {
   id: string;
@@ -37,8 +37,6 @@ export interface TemplateResult {
 
 export const TEMPLATE_LABELS: Record<TemplateType, string> = {
   card_news: '카드 뉴스',
-  short_story: '짧은 소설',
-  key_points: '핵심 내용과 해설',
   meeting_minutes: '회의록',
 };
 

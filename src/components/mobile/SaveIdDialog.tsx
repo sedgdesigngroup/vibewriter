@@ -58,12 +58,12 @@ export default function SaveIdDialog({ isOpen, onSave, onClose, isSaving }: Save
         {/* 안내 문구 */}
         <p className="text-slate-400 text-xs mb-4">
           저장 시, 대화 내용과 시간대가 구분되어 저장됩니다.
-          4가지 템플릿(카드뉴스, 짧은소설, 핵심+해설, 회의록)이 자동으로 생성됩니다.
+          웹서치로 관련 이론/이슈를 보강한 카드뉴스와 회의록이 자동 생성됩니다.
         </p>
 
         {/* 템플릿 미리보기 */}
         <div className="flex flex-wrap gap-2 mb-6">
-          {['카드 뉴스', '짧은 소설', '핵심+해설', '회의록'].map((label) => (
+          {['카드 뉴스', '회의록'].map((label) => (
             <span
               key={label}
               className="px-3 py-1 rounded-full bg-sky-500/20 text-sky-400 text-xs"

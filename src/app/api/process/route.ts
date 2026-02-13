@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
   // 전사 텍스트 합치기
   const fullText = transcriptions.map(t => t.content).join('\n');
 
-  // 4종 template_results 레코드 생성 (processing 상태)
-  const types: TemplateType[] = ['card_news', 'short_story', 'key_points', 'meeting_minutes'];
+  // 2종 template_results 레코드 생성 (processing 상태)
+  const types: TemplateType[] = ['card_news', 'meeting_minutes'];
   for (const type of types) {
     await supabaseAdmin
       .from('template_results')
