@@ -19,7 +19,7 @@ export async function GET(
   // 전사 원문 (세션 정보 포함)
   const { data: transcriptions } = await supabaseAdmin
     .from('transcriptions')
-    .select('content, timestamp_seconds, segment_order, session_id, clock_time')
+    .select('id, content, timestamp_seconds, segment_order, session_id, clock_time')
     .eq('project_id', projectId)
     .order('segment_order');
 

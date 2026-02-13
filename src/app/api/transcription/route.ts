@@ -20,6 +20,36 @@ interface SessionGroupInput {
   sessions: SessionInput[];
 }
 
+// 개별 세그먼트 삭제
+export async function DELETE(request: NextRequest) {
+  const { segmentIds } = await request.json();
+
+  if (!segmentIds || !Array.isArray(segmentIds) || segmentIds.length === 0) {
+    return NextResponse.json({ error: '삭제할 세그먼트 ID가 필요합니다' }, { status: 400 });
+  }
+
+  // 삭제 전 내용 조회 (부분 재생성용)
+  const { data: segments } = await supabaseAdmin
+    .from('transcriptions')
+    .select('content')
+    .in('id', segmentIds)
+    .order('segment_order');
+
+  const removedContent = segments?.map(s => s.content).join('\n') || '';
+
+  // 삭제 실행
+  const { error } = await supabaseAdmin
+    .from('transcriptions')
+    .delete()
+    .in('id', segmentIds);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, removedContent });
+}
+
 // 전사 데이터 일괄 저장
 export async function POST(request: NextRequest) {
   const body = await request.json();
