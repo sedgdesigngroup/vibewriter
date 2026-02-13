@@ -1,0 +1,22 @@
+{
+  "name": "바이브라이팅 - Vibe Writing",
+  "short_name": "바이브라이팅",
+  "description": "음성을 텍스트로 전사하고 다양한 템플릿으로 가공하는 앱",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
