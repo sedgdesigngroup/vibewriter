@@ -8,7 +8,7 @@ export function useAudioVisualizer() {
   const streamRef = useRef<MediaStream | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (): Promise<{ analyser: AnalyserNode; audioContext: AudioContext; stream: MediaStream }> => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -24,7 +24,7 @@ export function useAudioVisualizer() {
       source.connect(analyser);
       sourceRef.current = source;
 
-      return { analyser, audioContext };
+      return { analyser, audioContext, stream };
     } catch (err) {
       console.error('마이크 접근 실패:', err);
       throw err;
