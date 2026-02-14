@@ -25,8 +25,11 @@ interface AllDayStore {
   stopSessionGroup: () => void;
 
   // 세션 관리 (침묵 기반 자동 분리)
-  addSegment: (content: string) => void;
+  addSegment: (content: string, source?: 'webSpeech' | 'whisper') => void;
   finalizeSession: () => void;
+
+  // Whisper 재전사 시 세션그룹 세그먼트 교체
+  replaceCurrentGroupSegments: (newSegments: TranscriptionSegment[]) => void;
 
   // 백그라운드 처리
   onBackgrounded: () => void;
@@ -159,7 +162,7 @@ export const useAllDayStore = create<AllDayStore>((set, get) => ({
     });
   },
 
-  addSegment: (content: string) => {
+  addSegment: (content: string, source?: 'webSpeech' | 'whisper') => {
     const state = get();
     if (!state.allDaySession || !state.currentSessionGroup) return;
 
@@ -180,13 +183,14 @@ export const useAllDayStore = create<AllDayStore>((set, get) => ({
 
     const segment: TranscriptionSegment = {
       id: generateId('seg'),
-      sessionId: state.allDaySession.id, // IndexedDB 호환용
+      sessionId: state.allDaySession.id,
       content,
       timestamp: now - state.allDaySession.startTime,
       order: segmentOrder++,
       savedToServer: false,
       speechSessionId: session.id,
       clockTime: now,
+      source: source || 'webSpeech',
     };
 
     const updatedSession: SpeechSession = {
@@ -222,6 +226,39 @@ export const useAllDayStore = create<AllDayStore>((set, get) => ({
     set({
       currentSessionGroup: updatedGroup,
       currentSession: null,
+    });
+  },
+
+  replaceCurrentGroupSegments: (newSegments: TranscriptionSegment[]) => {
+    const state = get();
+    if (!state.allDaySession) return;
+
+    // 가장 최근에 완료된 세션그룹의 세그먼트를 교체
+    const groups = [...state.allDaySession.sessionGroups];
+    if (groups.length === 0) return;
+
+    const lastGroup = groups[groups.length - 1];
+
+    // 새 세그먼트를 단일 세션에 넣어서 교체
+    const replacementSession: SpeechSession = {
+      id: generateId('session'),
+      sessionGroupId: lastGroup.id,
+      startTime: lastGroup.startTime,
+      endTime: lastGroup.endTime,
+      segments: newSegments,
+      order: 0,
+    };
+
+    groups[groups.length - 1] = {
+      ...lastGroup,
+      sessions: [replacementSession],
+    };
+
+    set({
+      allDaySession: {
+        ...state.allDaySession,
+        sessionGroups: groups,
+      },
     });
   },
 

@@ -6,9 +6,9 @@ export interface TranscriptionSegment {
   timestamp: number; // 녹음 시작 기준 경과 시간 (ms)
   order: number;
   savedToServer: boolean;
-  // 하루종일 모드 전용 (기존 녹음에서는 미사용)
   speechSessionId?: string; // 소속 세션 ID (침묵 기준 분리 단위)
   clockTime?: number;       // 실제 시각 (Date.now())
+  source?: 'webSpeech' | 'whisper'; // 어떤 엔진이 생성했는지
 }
 
 // 프로젝트
