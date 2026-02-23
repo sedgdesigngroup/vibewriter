@@ -1,3 +1,5 @@
+import OpenAI, { toFile } from 'openai';
+
 export interface WhisperSegment {
   start: number;
   end: number;
@@ -9,35 +11,30 @@ export interface WhisperResult {
   segments: WhisperSegment[];
 }
 
-const TRANSCRIPTION_SERVER_URL =
-  process.env.TRANSCRIPTION_SERVER_URL || 'http://localhost:8000';
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function transcribeAudio(
   audioBuffer: Buffer,
   filename: string = 'recording.webm'
 ): Promise<WhisperResult> {
-  const formData = new FormData();
-  const blob = new Blob([new Uint8Array(audioBuffer)], { type: 'audio/webm' });
-  formData.append('audio', blob, filename);
+  const file = await toFile(audioBuffer, filename, { type: 'audio/webm' });
 
-  const res = await fetch(`${TRANSCRIPTION_SERVER_URL}/transcribe`, {
-    method: 'POST',
-    body: formData,
+  const response = await openai.audio.transcriptions.create({
+    model: 'whisper-1',
+    file,
+    language: 'ko',
+    response_format: 'verbose_json',
+    timestamp_granularities: ['segment'],
   });
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Faster-Whisper 전사 실패 (${res.status}): ${errorText}`);
-  }
-
-  const data = await res.json();
+  const segments: WhisperSegment[] = ((response as { segments?: WhisperSegment[] }).segments ?? []).map((seg) => ({
+    start: seg.start,
+    end: seg.end,
+    text: seg.text.trim(),
+  }));
 
   return {
-    text: data.text || '',
-    segments: (data.segments ?? []).map((seg: WhisperSegment) => ({
-      start: seg.start,
-      end: seg.end,
-      text: seg.text,
-    })),
+    text: response.text || '',
+    segments: segments.filter((seg) => seg.text.length > 0),
   };
 }
