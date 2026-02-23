@@ -78,3 +78,24 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({ projects });
 }
+
+// 프로젝트 삭제 (CASCADE로 관련 데이터 모두 삭제)
+export async function DELETE(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const projectId = searchParams.get('projectId');
+
+  if (!projectId) {
+    return NextResponse.json({ error: '프로젝트 ID가 필요합니다' }, { status: 400 });
+  }
+
+  const { error } = await supabaseAdmin
+    .from('projects')
+    .delete()
+    .eq('id', projectId);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}

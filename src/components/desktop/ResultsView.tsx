@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Calendar from './Calendar';
 import ProjectList from './ProjectList';
 import ContentViewer from './ContentViewer';
@@ -17,22 +17,28 @@ export default function ResultsView({ userId, onLogout }: ResultsViewProps) {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchProjects = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/projects?userId=${encodeURIComponent(userId)}`);
+      const data = await res.json();
+      setProjects(data.projects || []);
+    } catch (err) {
+      console.error('프로젝트 로드 실패:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
   // 프로젝트 목록 조회
   useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        const res = await fetch(`/api/projects?userId=${encodeURIComponent(userId)}`);
-        const data = await res.json();
-        setProjects(data.projects || []);
-      } catch (err) {
-        console.error('프로젝트 로드 실패:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchProjects();
-  }, [userId]);
+  }, [fetchProjects]);
+
+  // 프로젝트 삭제 후 콜백
+  const handleProjectDeleted = useCallback(() => {
+    setSelectedProject(null);
+    fetchProjects();
+  }, [fetchProjects]);
 
   // 프로젝트가 있는 날짜 Set
   const projectDates = useMemo(() => {
@@ -98,7 +104,7 @@ export default function ResultsView({ userId, onLogout }: ResultsViewProps) {
       {/* 우측 패널: 콘텐츠 뷰어 */}
       <div className="flex-1 p-6">
         {selectedProject ? (
-          <ContentViewer projectId={selectedProject.id} />
+          <ContentViewer projectId={selectedProject.id} onDelete={handleProjectDeleted} />
         ) : (
           <div className="flex items-center justify-center h-full text-slate-500">
             <div className="text-center">
