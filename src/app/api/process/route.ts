@@ -32,7 +32,7 @@ async function handleUpdateMode(
     return NextResponse.json({ error: '삭제된 내용과 기존 템플릿이 필요합니다' }, { status: 400 });
   }
 
-  const types: TemplateType[] = ['card_news', 'meeting_minutes'];
+  const types: TemplateType[] = ['card_news', 'meeting_minutes', 'short_story', 'key_points'];
 
   for (const type of types) {
     if (existingTemplates[type]) {
@@ -112,7 +112,7 @@ async function handleFullMode(projectId: string) {
   const fullText = transcriptions.map(t => t.content).join('\n');
 
   // 2종 template_results 레코드 생성 (processing 상태)
-  const types: TemplateType[] = ['card_news', 'meeting_minutes'];
+  const types: TemplateType[] = ['card_news', 'meeting_minutes', 'short_story', 'key_points'];
   for (const type of types) {
     await supabaseAdmin
       .from('template_results')

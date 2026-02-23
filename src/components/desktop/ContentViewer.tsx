@@ -24,7 +24,7 @@ interface TranscriptionData {
   clock_time?: string | null;
 }
 
-const TEMPLATE_TYPES: TemplateType[] = ['card_news', 'meeting_minutes'];
+const TEMPLATE_TYPES: TemplateType[] = ['card_news', 'meeting_minutes', 'short_story', 'key_points'];
 
 export default function ContentViewer({ projectId }: ContentViewerProps) {
   const [viewMode, setViewMode] = useState<'raw' | 'template'>('template');

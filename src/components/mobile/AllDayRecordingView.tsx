@@ -8,6 +8,7 @@ import { useAudioVisualizer } from '@/hooks/useAudioVisualizer';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import { useSilentAudioKeepAlive } from '@/hooks/useSilentAudioKeepAlive';
 import { useBackgroundDetection } from '@/hooks/useBackgroundDetection';
+import toast, { Toaster } from 'react-hot-toast';
 import { useSessionPersistence } from '@/hooks/useSessionPersistence';
 import AllDayStatusBar from './AllDayStatusBar';
 import AllDayControls from './AllDayControls';
@@ -321,7 +322,7 @@ export default function AllDayRecordingView() {
         body: JSON.stringify({ userId }),
       });
       if (!authRes.ok) {
-        alert('사용자 확인에 실패했습니다.');
+        toast.error('사용자 확인에 실패했습니다.');
         setIsSaving(false);
         return;
       }
@@ -339,7 +340,7 @@ export default function AllDayRecordingView() {
         }),
       });
       if (!projectRes.ok) {
-        alert('프로젝트 생성에 실패했습니다.');
+        toast.error('프로젝트 생성에 실패했습니다.');
         setIsSaving(false);
         return;
       }
@@ -374,10 +375,10 @@ export default function AllDayRecordingView() {
       await clearRecoverable();
       setShowSaveDialog(false);
       reset();
-      alert('저장되었습니다! 템플릿 생성이 진행 중입니다.');
+      toast.success('저장되었습니다! 템플릿 생성이 진행 중입니다.');
     } catch (err) {
       console.error('저장 실패:', err);
-      alert('저장에 실패했습니다. 다시 시도해주세요.');
+      toast.error('저장에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setIsSaving(false);
     }
@@ -416,6 +417,7 @@ export default function AllDayRecordingView() {
 
   return (
     <div className="flex flex-col h-screen bg-slate-900">
+      <Toaster position="top-center" toastOptions={{ style: { background: '#1e293b', color: '#fff', borderRadius: '12px' } }} />
       {/* 오버레이들 */}
       {isTranscribing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">

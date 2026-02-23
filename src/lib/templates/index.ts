@@ -3,10 +3,14 @@ import { generateTemplate, summarizeChunk, extractMeetingInfo } from '@/lib/open
 import { searchRelatedTopics } from '@/lib/openai/webSearch';
 import { CARD_NEWS_PROMPT } from './cardNews';
 import { MEETING_MINUTES_PROMPT } from './meetingMinutes';
+import { SHORT_STORY_PROMPT } from './shortStory';
+import { KEY_POINTS_PROMPT } from './keyPoints';
 
 const TEMPLATE_PROMPTS: Record<TemplateType, string> = {
   card_news: CARD_NEWS_PROMPT,
   meeting_minutes: MEETING_MINUTES_PROMPT,
+  short_story: SHORT_STORY_PROMPT,
+  key_points: KEY_POINTS_PROMPT,
 };
 
 // 대략적인 토큰 수 추정 (한국어: ~1.5 토큰/글자)
@@ -113,7 +117,7 @@ export async function processTemplate(
 export async function processAllTemplates(
   transcription: string
 ): Promise<Record<TemplateType, { content: string | null; error: string | null }>> {
-  const types: TemplateType[] = ['card_news', 'meeting_minutes'];
+  const types: TemplateType[] = ['card_news', 'meeting_minutes', 'short_story', 'key_points'];
 
   // 웹 검색으로 관련 정보 수집 (모든 템플릿이 공유)
   console.log('웹 검색 enrichment 시작...');

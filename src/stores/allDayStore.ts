@@ -297,7 +297,15 @@ export const useAllDayStore = create<AllDayStore>((set, get) => ({
     });
   },
 
-  setInterimText: (text: string) => set({ interimText: text }),
+  setInterimText: (text: string) => {
+    // interimText가 있으면 음성이 감지된 것이므로 lastSpeechTime도 갱신
+    // → 침묵 카운트다운이 말하는 중에 진행되는 버그 방지
+    if (text) {
+      set({ interimText: text, lastSpeechTime: Date.now() });
+    } else {
+      set({ interimText: text });
+    }
+  },
 
   recoverSession: (session: AllDaySession) => {
     // 기존 세션 복구 시 카운터 복원

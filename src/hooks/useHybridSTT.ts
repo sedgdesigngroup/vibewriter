@@ -35,6 +35,7 @@ interface UseHybridSTTOptions {
 
 const WHISPER_CHUNK_DURATION_MS = 10 * 1000; // 10초 청크
 const WHISPER_MIN_CHUNK_SIZE = 1000; // 최소 1KB (무음 스킵)
+const WHISPER_MAX_CHUNK_BYTES = 10 * 1024 * 1024; // 누적 상한 10MB
 
 export function useHybridSTT(options: UseHybridSTTOptions) {
   const { addSegment, setInterimText } = options;
@@ -63,6 +64,20 @@ export function useHybridSTT(options: UseHybridSTTOptions) {
   // ============================================================
   // Whisper 10초 청크 파이프라인
   // ============================================================
+
+  // 실패 시 청크 복원 (상한 초과 시 오래된 청크 드롭)
+  const restoreChunks = (failed: Blob[]) => {
+    const merged = [...failed, ...currentChunkRef.current];
+    let totalSize = 0;
+    const kept: Blob[] = [];
+    // 최신 청크부터 유지 (뒤에서부터)
+    for (let i = merged.length - 1; i >= 0; i--) {
+      totalSize += merged[i].size;
+      if (totalSize > WHISPER_MAX_CHUNK_BYTES) break;
+      kept.unshift(merged[i]);
+    }
+    currentChunkRef.current = kept;
+  };
 
   const flushChunkToWhisper = useCallback(async () => {
     if (isFlushingRef.current) return; // 이전 요청 진행 중이면 스킵 (청크는 계속 누적됨)
@@ -102,13 +117,11 @@ export function useHybridSTT(options: UseHybridSTTOptions) {
         }
       } else {
         console.error('[HybridSTT] Whisper 청크 전사 실패:', res.status);
-        // 실패 시 청크를 복원하여 다음 flush에서 재전송
-        currentChunkRef.current = [...chunksToSend, ...currentChunkRef.current];
+        restoreChunks(chunksToSend);
       }
     } catch (err) {
       console.error('[HybridSTT] Whisper 청크 요청 오류:', err);
-      // 네트워크 에러 시에도 청크 복원
-      currentChunkRef.current = [...chunksToSend, ...currentChunkRef.current];
+      restoreChunks(chunksToSend);
     } finally {
       isFlushingRef.current = false;
     }
