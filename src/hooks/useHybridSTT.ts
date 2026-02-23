@@ -34,7 +34,7 @@ interface UseHybridSTTOptions {
 }
 
 const WHISPER_CHUNK_DURATION_MS = 10 * 1000; // 10초 청크
-const WHISPER_MIN_CHUNK_SIZE = 5000; // 최소 5KB (무음 스킵)
+const WHISPER_MIN_CHUNK_SIZE = 1000; // 최소 1KB (무음 스킵)
 
 export function useHybridSTT(options: UseHybridSTTOptions) {
   const { addSegment, setInterimText } = options;
@@ -52,6 +52,7 @@ export function useHybridSTT(options: UseHybridSTTOptions) {
   const currentChunkRef = useRef<Blob[]>([]);
   const chunkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const externalStreamUsedRef = useRef(false);
+  const isFlushingRef = useRef(false);
 
   // -- 콜백 안정 ref --
   const addSegmentRef = useRef(addSegment);
@@ -64,6 +65,7 @@ export function useHybridSTT(options: UseHybridSTTOptions) {
   // ============================================================
 
   const flushChunkToWhisper = useCallback(async () => {
+    if (isFlushingRef.current) return; // 이전 요청 진행 중이면 스킵 (청크는 계속 누적됨)
     if (currentChunkRef.current.length === 0) return;
 
     const chunksToSend = [...currentChunkRef.current];
@@ -73,6 +75,7 @@ export function useHybridSTT(options: UseHybridSTTOptions) {
 
     if (audioBlob.size < WHISPER_MIN_CHUNK_SIZE) return;
 
+    isFlushingRef.current = true;
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob, `chunk_${Date.now()}.webm`);
@@ -99,9 +102,15 @@ export function useHybridSTT(options: UseHybridSTTOptions) {
         }
       } else {
         console.error('[HybridSTT] Whisper 청크 전사 실패:', res.status);
+        // 실패 시 청크를 복원하여 다음 flush에서 재전송
+        currentChunkRef.current = [...chunksToSend, ...currentChunkRef.current];
       }
     } catch (err) {
       console.error('[HybridSTT] Whisper 청크 요청 오류:', err);
+      // 네트워크 에러 시에도 청크 복원
+      currentChunkRef.current = [...chunksToSend, ...currentChunkRef.current];
+    } finally {
+      isFlushingRef.current = false;
     }
   }, []);
 
@@ -288,6 +297,7 @@ export function useHybridSTT(options: UseHybridSTTOptions) {
     start,
     stop,
     forceRestart,
+    flush: flushChunkToWhisper,
     isSupported: typeof window !== 'undefined' &&
       !!(window.SpeechRecognition || window.webkitSpeechRecognition),
   };

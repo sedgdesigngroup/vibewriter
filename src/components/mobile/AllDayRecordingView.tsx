@@ -50,7 +50,7 @@ export default function AllDayRecordingView() {
   const { start: startVisualizer, stop: stopVisualizer } = useAudioVisualizer();
   const streamRef = useRef<MediaStream | null>(null);
 
-  const { start: startSTT, stop: stopSTT, forceRestart } = useHybridSTT({
+  const { start: startSTT, stop: stopSTT, forceRestart, flush: flushSTT } = useHybridSTT({
     addSegment,
     setInterimText,
   });
@@ -107,13 +107,14 @@ export default function AllDayRecordingView() {
       return;
     }
 
-    silenceTimerRef.current = setInterval(() => {
+    silenceTimerRef.current = setInterval(async () => {
       const state = useAllDayStore.getState();
       if (!state.isRecording || !state.lastSpeechTime || !state.currentSession) return;
       if (state.currentSession.segments.length === 0) return;
 
       const silenceMs = Date.now() - state.lastSpeechTime;
       if (silenceMs >= SILENCE_AUTO_SPLIT_MS) {
+        await flushSTT(); // 남은 청크를 전사한 뒤 분리
         finalizeSession();
       }
     }, 2000);
@@ -124,7 +125,7 @@ export default function AllDayRecordingView() {
         silenceTimerRef.current = null;
       }
     };
-  }, [isRecording, finalizeSession]);
+  }, [isRecording, finalizeSession, flushSTT]);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
