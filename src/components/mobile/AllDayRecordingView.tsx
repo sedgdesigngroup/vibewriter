@@ -20,7 +20,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import SaveIdDialog from './SaveIdDialog';
 import type { TranscriptionSegment } from '@/types';
 
-const VOICE_RMS_THRESHOLD = 0.02;
+const VOICE_RMS_THRESHOLD = 0.01; // 민감도 향상 (0.02 → 0.01)
 
 const STORAGE_KEY = 'vibe-writing-userId';
 const SILENCE_AUTO_SPLIT_MS = 60 * 1000; // 60초 침묵 → 세션 자동 분리
@@ -70,7 +70,8 @@ export default function AllDayRecordingView() {
   const [elapsedTick, setElapsedTick] = useState(0);
   const [voiceDetected, setVoiceDetected] = useState(false);
 
-  // 오디오 레벨 기반 음성 감지
+  // 오디오 레벨 기반 음성 감지 + 침묵 타이머 연동
+  const lastTouchRef = useRef(0);
   useEffect(() => {
     if (!analyser || !isRecording) {
       setVoiceDetected(false);
@@ -88,7 +89,18 @@ export default function AllDayRecordingView() {
         sum += v * v;
       }
       const rms = Math.sqrt(sum / dataArray.length);
-      setVoiceDetected(rms > VOICE_RMS_THRESHOLD);
+      const detected = rms > VOICE_RMS_THRESHOLD;
+      setVoiceDetected(detected);
+
+      // 음성 감지 시 lastSpeechTime 갱신 (500ms throttle)
+      if (detected) {
+        const now = Date.now();
+        if (now - lastTouchRef.current > 500) {
+          lastTouchRef.current = now;
+          useAllDayStore.setState({ lastSpeechTime: now });
+        }
+      }
+
       animId = requestAnimationFrame(check);
     };
 
