@@ -35,10 +35,13 @@ export default function ResultsView({ userId, onLogout }: ResultsViewProps) {
   }, [fetchProjects]);
 
   // 프로젝트 삭제 후 콜백
-  const handleProjectDeleted = useCallback(() => {
-    setSelectedProject(null);
+  const handleProjectDeleted = useCallback((deletedId?: string) => {
+    // 현재 선택된 프로젝트가 삭제된 경우 선택 해제
+    if (!deletedId || selectedProject?.id === deletedId) {
+      setSelectedProject(null);
+    }
     fetchProjects();
-  }, [fetchProjects]);
+  }, [fetchProjects, selectedProject?.id]);
 
   // 프로젝트가 있는 날짜 Set
   const projectDates = useMemo(() => {
@@ -95,6 +98,7 @@ export default function ResultsView({ userId, onLogout }: ResultsViewProps) {
                 projects={dateProjects}
                 selectedProjectId={selectedProject?.id || null}
                 onSelect={setSelectedProject}
+                onDelete={handleProjectDeleted}
               />
             )}
           </div>
@@ -104,7 +108,7 @@ export default function ResultsView({ userId, onLogout }: ResultsViewProps) {
       {/* 우측 패널: 콘텐츠 뷰어 */}
       <div className="flex-1 p-6">
         {selectedProject ? (
-          <ContentViewer projectId={selectedProject.id} onDelete={handleProjectDeleted} />
+          <ContentViewer projectId={selectedProject.id} />
         ) : (
           <div className="flex items-center justify-center h-full text-slate-500">
             <div className="text-center">

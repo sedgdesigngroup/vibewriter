@@ -6,7 +6,6 @@ import { TEMPLATE_LABELS } from '@/types';
 
 interface ContentViewerProps {
   projectId: string;
-  onDelete?: () => void;
 }
 
 interface TemplateData {
@@ -27,15 +26,13 @@ interface TranscriptionData {
 
 const TEMPLATE_TYPES: TemplateType[] = ['card_news', 'meeting_minutes', 'short_story', 'key_points'];
 
-export default function ContentViewer({ projectId, onDelete }: ContentViewerProps) {
+export default function ContentViewer({ projectId }: ContentViewerProps) {
   const [viewMode, setViewMode] = useState<'raw' | 'template'>('template');
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>('card_news');
   const [templates, setTemplates] = useState<TemplateData[]>([]);
   const [transcription, setTranscription] = useState<TranscriptionData[]>([]);
   const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set());
   const [isApplying, setIsApplying] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -153,23 +150,6 @@ export default function ContentViewer({ projectId, onDelete }: ContentViewerProp
     }
   }, [pendingDeletes, transcription, templates, projectId, fetchData]);
 
-  const handleDeleteProject = useCallback(async () => {
-    setIsDeleting(true);
-    try {
-      const res = await fetch(`/api/projects?projectId=${projectId}`, { method: 'DELETE' });
-      if (res.ok) {
-        setShowDeleteConfirm(false);
-        onDelete?.();
-      } else {
-        console.error('프로젝트 삭제 실패');
-      }
-    } catch (err) {
-      console.error('프로젝트 삭제 오류:', err);
-    } finally {
-      setIsDeleting(false);
-    }
-  }, [projectId, onDelete]);
-
   if (initialLoading) {
     return (
       <div className="flex items-center justify-center h-full text-slate-400">
@@ -212,12 +192,6 @@ export default function ContentViewer({ projectId, onDelete }: ContentViewerProp
               갱신 적용 중...
             </span>
           )}
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="px-3 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm transition-colors"
-          >
-            프로젝트 삭제
-          </button>
         </div>
       </div>
 
@@ -345,33 +319,6 @@ export default function ContentViewer({ projectId, onDelete }: ContentViewerProp
         )}
       </div>
 
-      {/* 프로젝트 삭제 확인 다이얼로그 */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-800 border border-slate-600 rounded-xl p-6 max-w-sm mx-4">
-            <h3 className="text-white text-lg font-semibold mb-2">프로젝트 삭제</h3>
-            <p className="text-slate-400 text-sm mb-6">
-              이 프로젝트와 모든 전사/템플릿 데이터가 영구 삭제됩니다. 계속하시겠습니까?
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={isDeleting}
-                className="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-sm transition-colors"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleDeleteProject}
-                disabled={isDeleting}
-                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm transition-colors disabled:opacity-50"
-              >
-                {isDeleting ? '삭제 중...' : '삭제'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
