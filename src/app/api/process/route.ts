@@ -55,7 +55,7 @@ async function handleUpdateMode(
       .map(async (type) => {
         const systemPrompt = getUpdateSystemPrompt(type);
         const userPrompt = getUpdateUserPrompt(existingTemplates[type], removedContent);
-        const content = await generateTemplate(userPrompt, systemPrompt);
+        const content = await generateTemplate(userPrompt, systemPrompt, type);
         return { type, content };
       });
 

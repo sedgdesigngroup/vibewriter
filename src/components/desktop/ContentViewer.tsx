@@ -335,19 +335,98 @@ function formatClockTime(isoString: string): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-// 간단한 마크다운 → HTML 변환
+// 마크다운 → HTML 변환
 function markdownToHtml(md: string): string {
-  return md
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+  const lines = md.split('\n');
+  const result: string[] = [];
+  let inTable = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    // 테이블 행 감지
+    if (line.startsWith('|') && line.endsWith('|')) {
+      // 구분선 행 (|------|------| ) 스킵
+      if (/^\|[\s\-:|]+\|$/.test(line)) continue;
+
+      if (!inTable) {
+        result.push('<table class="w-full border-collapse my-3 text-sm">');
+        inTable = true;
+      }
+
+      const cells = line.split('|').filter(c => c !== '').map(c => c.trim());
+      const isHeader = i + 1 < lines.length && /^\|[\s\-:|]+\|$/.test(lines[i + 1].trim());
+
+      if (isHeader) {
+        result.push('<thead><tr>' + cells.map(c =>
+          `<th class="border border-slate-600 bg-slate-700/50 px-3 py-2 text-left font-medium text-slate-300">${applyInline(c)}</th>`
+        ).join('') + '</tr></thead><tbody>');
+      } else {
+        result.push('<tr>' + cells.map(c =>
+          `<td class="border border-slate-600/50 px-3 py-2 text-slate-300">${applyInline(c)}</td>`
+        ).join('') + '</tr>');
+      }
+      continue;
+    }
+
+    // 테이블 종료
+    if (inTable) {
+      result.push('</tbody></table>');
+      inTable = false;
+    }
+
+    // 수평선 (---)
+    if (/^-{3,}$/.test(line) || /^\*{3,}$/.test(line)) {
+      result.push('<hr class="border-slate-700 my-4" />');
+      continue;
+    }
+
+    // 제목
+    if (line.startsWith('### ')) {
+      result.push(`<h3>${applyInline(line.slice(4))}</h3>`);
+    } else if (line.startsWith('## ')) {
+      result.push(`<h2>${applyInline(line.slice(3))}</h2>`);
+    } else if (line.startsWith('# ')) {
+      result.push(`<h1>${applyInline(line.slice(2))}</h1>`);
+    }
+    // 체크박스
+    else if (line.startsWith('- [ ] ')) {
+      result.push(`<li class="list-none">\u2610 ${applyInline(line.slice(6))}</li>`);
+    } else if (line.startsWith('- [x] ')) {
+      result.push(`<li class="list-none">\u2611 ${applyInline(line.slice(6))}</li>`);
+    }
+    // 리스트
+    else if (line.startsWith('- ')) {
+      result.push(`<li>${applyInline(line.slice(2))}</li>`);
+    }
+    // 번호 리스트
+    else if (/^\d+\.\s/.test(line)) {
+      const text = line.replace(/^\d+\.\s/, '');
+      result.push(`<li>${applyInline(text)}</li>`);
+    }
+    // 인용
+    else if (line.startsWith('> ')) {
+      result.push(`<blockquote class="border-l-2 border-slate-500 pl-3 my-1 text-slate-400 italic">${applyInline(line.slice(2))}</blockquote>`);
+    }
+    // 빈 줄
+    else if (line === '') {
+      result.push('<br>');
+    }
+    // 일반 텍스트
+    else {
+      result.push(`<p>${applyInline(line)}</p>`);
+    }
+  }
+
+  if (inTable) {
+    result.push('</tbody></table>');
+  }
+
+  return result.join('\n');
+}
+
+function applyInline(text: string): string {
+  return text
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/^- \[ \] (.+)$/gm, '<li class="list-none">☐ $1</li>')
-    .replace(/^- \[x\] (.+)$/gm, '<li class="list-none">☑ $1</li>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br>')
-    .replace(/^/, '<p>')
-    .replace(/$/, '</p>');
+    .replace(/\*(.+?)\*/g, '<em>$1</em>');
 }

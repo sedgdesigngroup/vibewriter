@@ -5,9 +5,11 @@ interface ConfirmDialogProps {
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
+  confirmText?: string;
+  cancelText?: string;
 }
 
-export default function ConfirmDialog({ isOpen, message, onConfirm, onCancel }: ConfirmDialogProps) {
+export default function ConfirmDialog({ isOpen, message, onConfirm, onCancel, confirmText = '네', cancelText = '아니오' }: ConfirmDialogProps) {
   if (!isOpen) return null;
 
   return (
@@ -19,13 +21,13 @@ export default function ConfirmDialog({ isOpen, message, onConfirm, onCancel }: 
             onClick={onCancel}
             className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
           >
-            아니오
+            {cancelText}
           </button>
           <button
             onClick={onConfirm}
             className="flex-1 py-3 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-medium transition-colors"
           >
-            네
+            {confirmText}
           </button>
         </div>
       </div>

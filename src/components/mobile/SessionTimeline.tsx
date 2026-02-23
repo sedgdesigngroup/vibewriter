@@ -9,6 +9,8 @@ interface SessionTimelineProps {
   currentSession: SpeechSession | null;
   gaps: BackgroundGap[];
   interimText: string;
+  voiceDetected?: boolean;
+  compact?: boolean;
 }
 
 export default function SessionTimeline({
@@ -17,6 +19,8 @@ export default function SessionTimeline({
   currentSession,
   gaps,
   interimText,
+  voiceDetected = false,
+  compact = false,
 }: SessionTimelineProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -36,16 +40,44 @@ export default function SessionTimeline({
 
   const isEmpty = allSessions.length === 0 && !interimText;
 
+  // compact 모드: 최근 텍스트만 보여줌
+  if (compact) {
+    const recentSegments = allSessions
+      .flatMap(s => s.segments)
+      .slice(-3);
+
+    return (
+      <div className="flex-1 overflow-hidden px-2">
+        <div className="flex flex-col justify-end h-full gap-1">
+          {recentSegments.map((seg) => (
+            <p key={seg.id} className="text-slate-500 text-xs leading-relaxed truncate">
+              {seg.content}
+            </p>
+          ))}
+          {interimText && (
+            <p className="text-slate-600 text-xs italic truncate">{interimText}</p>
+          )}
+          {!interimText && voiceDetected && (
+            <p className="text-emerald-500/50 text-xs italic truncate animate-pulse">음성을 감지하는 중...</p>
+          )}
+          {recentSegments.length === 0 && !interimText && !voiceDetected && (
+            <p className="text-slate-700 text-xs text-center">말씀해 주세요...</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 전체 모드 (녹음 중지 후)
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-800 rounded-lg p-4 space-y-4">
+    <div className="flex-1 overflow-y-auto rounded-2xl p-4 space-y-4" style={{ backgroundColor: 'rgba(15, 23, 42, 0.5)' }}>
       {isEmpty && (
-        <p className="text-slate-500 text-center text-sm">
-          녹음을 시작하면 시간대별로 텍스트가 기록됩니다
+        <p className="text-slate-600 text-center text-sm">
+          녹음을 시작하면 텍스트가 기록됩니다
         </p>
       )}
 
       {allSessions.map((session, idx) => {
-        // 이전 세션과의 갭 표시
         const prevSession = idx > 0 ? allSessions[idx - 1] : null;
         const showGap = prevSession?.endTime && session.startTime - prevSession.endTime > 60000;
         const gapEntry = showGap ? gaps.find(g =>
@@ -56,35 +88,35 @@ export default function SessionTimeline({
         return (
           <div key={session.id}>
             {showGap && (
-              <div className="flex items-center gap-2 my-2">
-                <div className="flex-1 h-px bg-slate-700" />
-                <span className="text-slate-600 text-xs">
-                  {gapEntry ? '백그라운드 중단' : '침묵'}
+              <div className="flex items-center gap-2 my-3">
+                <div className="flex-1 h-px bg-slate-800" />
+                <span className="text-slate-600 text-[10px]">
+                  {gapEntry ? '중단' : '침묵'}
                   {' '}
                   {formatGapDuration(
                     prevSession?.endTime || 0,
                     session.startTime
                   )}
                 </span>
-                <div className="flex-1 h-px bg-slate-700" />
+                <div className="flex-1 h-px bg-slate-800" />
               </div>
             )}
 
-            <div className="border-l-2 border-sky-500/50 pl-3">
+            <div className="pl-1">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-sky-400 text-xs font-medium">
+                <span className="text-slate-500 text-[10px] font-medium">
                   {formatClockTime(session.startTime)}
                   {session.endTime && (
-                    <> ~ {formatClockTime(session.endTime)}</>
+                    <> — {formatClockTime(session.endTime)}</>
                   )}
                 </span>
-                <span className="text-slate-600 text-xs">
+                <span className="text-slate-700 text-[10px]">
                   {session.segments.length}건
                 </span>
               </div>
               <div className="space-y-1">
                 {session.segments.map((seg) => (
-                  <p key={seg.id} className="text-slate-200 text-sm leading-relaxed">
+                  <p key={seg.id} className="text-slate-300 text-sm leading-relaxed">
                     {seg.content}
                   </p>
                 ))}
@@ -94,10 +126,14 @@ export default function SessionTimeline({
         );
       })}
 
-      {/* 현재 인식 중인 텍스트 */}
       {interimText && (
-        <div className="border-l-2 border-slate-600 pl-3">
-          <p className="text-slate-400 text-sm italic">{interimText}</p>
+        <div className="pl-1">
+          <p className="text-slate-500 text-sm italic">{interimText}</p>
+        </div>
+      )}
+      {!interimText && voiceDetected && (
+        <div className="pl-1">
+          <p className="text-emerald-500/50 text-sm italic animate-pulse">음성을 감지하는 중...</p>
         </div>
       )}
 

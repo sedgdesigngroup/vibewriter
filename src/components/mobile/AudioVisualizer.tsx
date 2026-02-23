@@ -23,11 +23,10 @@ export default function AudioVisualizer({ analyser, isActive }: AudioVisualizerP
       animationRef.current = requestAnimationFrame(draw);
       analyser.getByteTimeDomainData(dataArray);
 
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.3)';
       ctx.beginPath();
 
       const sliceWidth = canvas.width / bufferLength;
@@ -56,16 +55,15 @@ export default function AudioVisualizer({ analyser, isActive }: AudioVisualizerP
     };
   }, [analyser, isActive]);
 
-  // 비활성 시 정적 라인 표시
+  // 비활성 시 정적 라인
   useEffect(() => {
     if (isActive || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#475569';
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.1)';
     ctx.beginPath();
     ctx.moveTo(0, canvas.height / 2);
     ctx.lineTo(canvas.width, canvas.height / 2);
@@ -76,8 +74,8 @@ export default function AudioVisualizer({ analyser, isActive }: AudioVisualizerP
     <canvas
       ref={canvasRef}
       width={600}
-      height={100}
-      className="w-full h-[60px] rounded-lg"
+      height={60}
+      className="w-full h-[40px]"
     />
   );
 }
